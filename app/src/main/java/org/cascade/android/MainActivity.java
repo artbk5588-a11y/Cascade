@@ -20,6 +20,8 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Android SPP and ELM327 transport bring-up. The CASCADE CPU/emulator core is
@@ -29,6 +31,7 @@ public final class MainActivity extends Activity {
     private static final int REQ_BT = 40;
     private static final UUID SPP = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
     private volatile BluetoothSocket socket;
+    private final ExecutorService sender = Executors.newSingleThreadExecutor();
     private TextView log;
     private LinearLayout deviceList;
 
@@ -104,7 +107,7 @@ public final class MainActivity extends Activity {
     }
 
     private void requestAndList() {
-        if (Build.VERSION.SDK_INT >= 31 &&
+        if (Build.VERSION.SDK_INT >= 31 && getApplicationInfo().targetSdkVersion >= 31 &&
             checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT}, REQ_BT);
             return;
@@ -159,16 +162,18 @@ public final class MainActivity extends Activity {
             appendLog("Нет SPP-соединения — команда не отправлена: " + command);
             return;
         }
-        new Thread(() -> {
+        sender.execute(() -> {
             try {
                 OutputStream out = current.getOutputStream();
                 appendLog("TX: " + command);
                 out.write((command + "\r").getBytes(StandardCharsets.US_ASCII));
                 out.flush();
+                // Keep ELM commands ordered and give the adapter time to answer.
+                Thread.sleep(300);
             } catch (Exception e) {
                 appendLog("Ошибка отправки: " + e.getMessage());
             }
-        }, "cascade-spp-send").start();
+        });
     }
 
     private void closeSocket() {
@@ -190,6 +195,7 @@ public final class MainActivity extends Activity {
 
     @Override protected void onDestroy() {
         closeSocket();
+        sender.shutdownNow();
         super.onDestroy();
     }
 }

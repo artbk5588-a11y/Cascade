@@ -1,0 +1,13 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'org.cascade.android'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'org.cascade.android'
+        minSdk 23
+        targetSdk 28
+        versionCode 1
+        versionName '0.1-spp-prototype'
+    }
+}

@@ -10,9 +10,14 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
+import android.widget.ImageView;
+import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -29,7 +34,7 @@ import java.util.concurrent.Executors;
 
 /**
  * Android prototype. The CASCADE CPU sources are compiled into the native library,
- * but the ROM, LCD rendering, keypad, and emulator lifecycle are not integrated yet.
+ * ROM loading, CPU controls, and LCD framebuffer rendering are integrated; keypad remains pending.
  */
 public final class MainActivity extends Activity {
     static {
@@ -40,6 +45,7 @@ public final class MainActivity extends Activity {
     private native String nativeLoadRom(String path);
     private native String nativeStartEmulation();
     private native String nativeStopEmulation();
+    private native int[] nativeGetFrame();
     private static final int REQ_ROM = 41;
     private native String nativeValidatePid00(String response);
     private static final int REQ_BT = 40;
@@ -48,6 +54,24 @@ public final class MainActivity extends Activity {
     private final ExecutorService sender = Executors.newSingleThreadExecutor();
     private TextView log;
     private LinearLayout deviceList;
+    private ImageView lcdView;
+    private Bitmap lcdBitmap;
+    private final Handler lcdHandler = new Handler(Looper.getMainLooper());
+    private final Runnable lcdRefresh = new Runnable() {
+        @Override public void run() {
+            if (lcdView == null || lcdBitmap == null || isFinishing()) return;
+            try {
+                int[] pixels = nativeGetFrame();
+                if (pixels != null && pixels.length == 480 * 360) {
+                    lcdBitmap.setPixels(pixels, 0, 480, 0, 0, 480, 360);
+                    lcdView.invalidate();
+                }
+            } catch (Exception e) {
+                appendLog("Ошибка обновления LCD: " + e.getMessage());
+            }
+            lcdHandler.postDelayed(this, 100);
+        }
+    };
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -59,6 +83,15 @@ public final class MainActivity extends Activity {
         title.setText("CASCADE Android — ядро подключено");
         title.setTextSize(21);
         root.addView(title);
+
+        lcdBitmap = Bitmap.createBitmap(480, 360, Bitmap.Config.ARGB_8888);
+        lcdBitmap.eraseColor(Color.BLACK);
+        lcdView = new ImageView(this);
+        lcdView.setImageBitmap(lcdBitmap);
+        lcdView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        lcdView.setAdjustViewBounds(true);
+        lcdView.setBackgroundColor(Color.BLACK);
+        root.addView(lcdView, new LinearLayout.LayoutParams(-1, 220));
 
         Button refresh = new Button(this);
         refresh.setText("Показать сопряжённые устройства");
@@ -112,7 +145,7 @@ public final class MainActivity extends Activity {
         root.addView(disconnect);
 
         log = new TextView(this);
-        log.setText("Ядро CASCADE собрано в native-библиотеку. Можно загрузить ROM и запустить CPU CASCADE через встроенный тестовый диагностический интерфейс. Экран LCD и клавиатура Android ещё не подключены.\n\nBluetooth/ELM327 здесь пока отдельный транспортный тест.\n");
+        log.setText("Ядро CASCADE собрано в native-библиотеку. Выберите ROM, запустите CPU и наблюдайте LCD выше. Клавиатура Android ещё не подключена.\n\nBluetooth/ELM327 здесь пока отдельный транспортный тест.\n");
         log.setTextIsSelectable(true);
         ScrollView logScroll = new ScrollView(this);
         logScroll.addView(log);

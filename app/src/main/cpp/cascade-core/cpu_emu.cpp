@@ -15,6 +15,7 @@
 #include "keypad.h"
 #include "hsio.h"
 #include "eeprom.h"
+#include "serial.h"
 
 int Cpu::emulate(void)
 {

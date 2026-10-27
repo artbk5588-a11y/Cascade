@@ -3,6 +3,7 @@
 #include <sys/stat.h>
 #include <thread>
 #include <mutex>
+#include <atomic>
 #include "cascade-core/iface_fake.h"
 
 #include "obd_response.h"
@@ -16,7 +17,7 @@ IfaceFake* g_cascadeIface = nullptr;
 std::thread g_emulationThread;
 std::mutex g_coreMutex;
 bool g_romLoaded = false;
-bool g_emulationRunning = false;
+std::atomic<bool> g_emulationRunning{false};
 
 void stopEmulationLocked() {
     if (g_cascadeCpu && g_emulationRunning) {
@@ -105,8 +106,7 @@ Java_org_cascade_android_MainActivity_nativeStartEmulation(JNIEnv* env, jobject 
     g_emulationRunning = true;
     g_emulationThread = std::thread([] {
         g_cascadeCpu->emulate();
-        std::lock_guard<std::mutex> doneLock(g_coreMutex);
-        g_emulationRunning = false;
+        g_emulationRunning.store(false);
     });
     return env->NewStringUTF("CORE_STARTING: CASCADE CPU thread started with the built-in fake diagnostic interface");
 }

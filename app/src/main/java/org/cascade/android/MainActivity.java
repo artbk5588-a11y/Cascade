@@ -48,7 +48,7 @@ public final class MainActivity extends Activity {
         root.setPadding(16, 12, 16, 12);
 
         TextView title = new TextView(this);
-        title.setText("Cascade Android — SPP / ELM327");
+        title.setText("CASCADE Android — ядро подключено");
         title.setTextSize(21);
         root.addView(title);
 
@@ -81,7 +81,7 @@ public final class MainActivity extends Activity {
         root.addView(disconnect);
 
         log = new TextView(this);
-        log.setText("Это транспортный прототип, не готовый эмулятор CASCADE.\n");
+        log.setText("Ядро эмулятора CASCADE собрано в native-библиотеку. Загрузка ROM, экран LCD и клавиатура Android ещё не подключены.\n\nBluetooth/ELM327 здесь пока отдельный транспортный тест.\n");
         log.setTextIsSelectable(true);
         ScrollView logScroll = new ScrollView(this);
         logScroll.addView(log);
@@ -152,7 +152,7 @@ public final class MainActivity extends Activity {
                 candidate = device.createRfcommSocketToServiceRecord(SPP);
                 candidate.connect();
                 socket = candidate;
-                appendLog("SPP подключён. Ядро CASCADE пока не интегрировано.");
+                appendLog("SPP подключён. Ядро CASCADE собрано, но пока не связано с этим каналом.");
                 InputStream in = candidate.getInputStream();
                 byte[] buffer = new byte[512];
                 while (candidate.isConnected()) {

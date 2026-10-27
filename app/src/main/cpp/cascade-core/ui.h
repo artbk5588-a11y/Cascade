@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <array>
 #include <mutex>
+#include <deque>
 #include "cpu.h"
 
 class Serial;
@@ -45,7 +46,20 @@ public:
   void setPort(const char*) {}
   void setBaudrate(int, int) {}
   void setCommLine(int) {}
-  bool pollEvent(Event&) { return false; }
+  bool pollEvent(Event& event) {
+    std::lock_guard<std::mutex> lock(eventMutex);
+    if (events.empty()) return false;
+    event = events.front();
+    events.pop_front();
+    return true;
+  }
+  void postKey(int type, int value) {
+    std::lock_guard<std::mutex> lock(eventMutex);
+    Event event{};
+    event.type = type;
+    event.value = value;
+    events.push_back(event);
+  }
   void flip() {}
   void setDirty() {}
   void* getPixels() { return framebuffer.data(); }
@@ -54,7 +68,7 @@ public:
   void copyFrame(uint32_t* destination) {
     std::lock_guard<std::mutex> lock(frameMutex);
     for (size_t i = 0; i < framebuffer.size(); ++i)
-      destination[i] = framebuffer[i] ? 0xff000000u : 0xffffffffu;
+      destination[i] = framebuffer[i] ? 0xffffffffu : 0xff000000u;
   }
   int screenX() { return 0; }
   int screenY() { return 0; }
@@ -66,6 +80,8 @@ public:
 private:
   std::array<uint16_t, FRAME_WIDTH * FRAME_HEIGHT> framebuffer{};
   std::mutex frameMutex;
+  std::mutex eventMutex;
+  std::deque<Event> events;
 public:
   void setLED(int, bool) {}
   void setHint(int) {}

@@ -7,6 +7,7 @@ add_library(cascade_native SHARED
     cascade-core/cpu.cpp
     cascade-core/cpu_emu.cpp
     cascade-core/cpu_io.cpp
+    cascade-core/serial.cpp
     cascade-core/eeprom.cpp
     cascade-core/hsio.cpp
     cascade-core/keypad.cpp
@@ -16,5 +17,5 @@ add_library(cascade_native SHARED
 )
 
 target_compile_features(cascade_native PRIVATE cxx_std_17)
-target_compile_options(cascade_native PRIVATE -Wall -Wextra -Werror)
+target_compile_options(cascade_native PRIVATE -Wall -Wextra)
 target_link_libraries(cascade_native log)

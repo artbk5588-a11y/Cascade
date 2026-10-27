@@ -53,6 +53,10 @@ public final class MainActivity extends Activity {
     private static final int REQ_BT = 40;
     private static final UUID SPP = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
     private volatile BluetoothSocket socket;
+    private volatile InputStream socketInput;
+    private volatile OutputStream socketOutput;
+    private final Object responseLock = new Object();
+    private final StringBuilder responseBuffer = new StringBuilder();
     private final ExecutorService sender = Executors.newSingleThreadExecutor();
     private TextView log;
     private LinearLayout deviceList;
@@ -340,13 +344,30 @@ public final class MainActivity extends Activity {
                 candidate = device.createRfcommSocketToServiceRecord(SPP);
                 candidate.connect();
                 socket = candidate;
-                appendLog("SPP подключён. Ядро CASCADE собрано, но пока не связано с этим каналом.");
-                InputStream in = candidate.getInputStream();
+                socketInput = candidate.getInputStream();
+                socketOutput = candidate.getOutputStream();
+                synchronized (responseLock) { responseBuffer.setLength(0); }
+                appendLog("SPP подключён. Ожидание ответов ELM327 до приглашения '>'.");
+                InputStream in = socketInput;
                 byte[] buffer = new byte[512];
+                StringBuilder currentResponse = new StringBuilder();
                 while (candidate.isConnected()) {
                     int n = in.read(buffer);
                     if (n < 0) break;
-                    if (n > 0) appendLog("RX: " + new String(buffer, 0, n, StandardCharsets.US_ASCII).replace("\r", "␍").replace("\n", "␊\n"));
+                    for (int i = 0; i < n; i++) {
+                        char ch = (char) (buffer[i] & 0xff);
+                        if (ch == '>') {
+                            String response = currentResponse.toString().trim();
+                            currentResponse.setLength(0);
+                            synchronized (responseLock) {
+                                responseBuffer.append(response).append("\n");
+                                responseLock.notifyAll();
+                            }
+                            if (!response.isEmpty()) appendLog("ELM RX: " + response.replace("\r", " ").replace("\n", " "));
+                        } else if (ch != '\0') {
+                            currentResponse.append(ch);
+                        }
+                    }
                 }
             } catch (Exception e) {
                 if (candidate != null) try { candidate.close(); } catch (IOException ignored) {}
@@ -363,21 +384,57 @@ public final class MainActivity extends Activity {
         }
         sender.execute(() -> {
             try {
-                OutputStream out = current.getOutputStream();
-                appendLog("TX: " + command);
+                OutputStream out = socketOutput;
+                if (out == null || current != socket || !current.isConnected()) {
+                    appendLog("SPP уже отключён — команда отменена: " + command);
+                    return;
+                }
+                synchronized (responseLock) { responseBuffer.setLength(0); }
+                appendLog("ELM TX: " + command);
                 out.write((command + "\r").getBytes(StandardCharsets.US_ASCII));
                 out.flush();
-                // Keep ELM commands ordered and give the adapter time to answer.
-                Thread.sleep(300);
+
+                // ELM327 terminates each command response with the '>' prompt.
+                long deadline = System.currentTimeMillis() + 5000;
+                String response = null;
+                synchronized (responseLock) {
+                    while (current == socket && current.isConnected() &&
+                           responseBuffer.length() == 0 &&
+                           System.currentTimeMillis() < deadline) {
+                        long remaining = deadline - System.currentTimeMillis();
+                        if (remaining > 0) responseLock.wait(remaining);
+                    }
+                    if (responseBuffer.length() > 0) {
+                        response = responseBuffer.toString().trim();
+                        responseBuffer.setLength(0);
+                    }
+                }
+                if (response == null || response.isEmpty()) {
+                    appendLog("ELM timeout: нет ответа с приглашением '>' на " + command);
+                } else {
+                    appendLog("Ответ на " + command + ": " + response.replace("\n", " | "));
+                    if ("0100".equalsIgnoreCase(command.replace(" ", ""))) {
+                        appendLog("Проверка PID 00: " + nativeValidatePid00(response));
+                    }
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                appendLog("Ожидание ответа ELM прервано");
             } catch (Exception e) {
-                appendLog("Ошибка отправки: " + e.getMessage());
+                appendLog("Ошибка обмена с ELM: " + e.getClass().getSimpleName() + ": " + e.getMessage());
             }
-        });
+        });;
     }
 
     private void closeSocket() {
         BluetoothSocket current = socket;
         socket = null;
+        socketInput = null;
+        socketOutput = null;
+        synchronized (responseLock) {
+            responseBuffer.setLength(0);
+            responseLock.notifyAll();
+        }
         if (current != null) new Thread(() -> {
             try { current.close(); } catch (IOException ignored) {}
         }).start();

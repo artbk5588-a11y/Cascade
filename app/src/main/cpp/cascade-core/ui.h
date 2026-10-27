@@ -39,7 +39,8 @@ enum {
 class UI {
 public:
   UI() = default;
-  void setSerial(Serial*) {}\n  void setPort(const char*) {}
+  void setSerial(Serial*) {}
+  void setPort(const char*) {}
   void setBaudrate(int, int) {}
   void setCommLine(int) {}
   bool pollEvent(Event&) { return false; }

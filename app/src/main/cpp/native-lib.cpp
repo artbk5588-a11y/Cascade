@@ -105,10 +105,17 @@ Java_org_cascade_android_MainActivity_nativeGetFrame(JNIEnv* env, jobject /* thi
     return result;
 }
 
+extern "C" JNIEXPORT void JNICALL
+Java_org_cascade_android_MainActivity_nativeKeyEvent(JNIEnv* /* env */, jobject /* this */, jint type, jint keyCode) {
+    std::lock_guard<std::mutex> lock(g_coreMutex);
+    if (g_cascadeUi && (type == EVENT_KEYDOWN || type == EVENT_KEYUP))
+        g_cascadeUi->postKey(type, keyCode);
+}
+
 extern "C" JNIEXPORT jstring JNICALL
 Java_org_cascade_android_MainActivity_nativeCoreStatus(JNIEnv* env, jobject /* this */) {
     return env->NewStringUTF(
-        "CASCADE CPU is linked. ROM loading and CPU controls are available; LCD framebuffer is exposed to Android. Keypad integration remains unfinished.");
+        "CASCADE CPU is linked. ROM loading and CPU controls are available; LCD framebuffer and Android keypad events are exposed to the app.");
 }
 
 extern "C" JNIEXPORT jstring JNICALL

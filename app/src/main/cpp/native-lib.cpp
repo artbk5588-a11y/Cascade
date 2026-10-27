@@ -86,10 +86,29 @@ Java_org_cascade_android_MainActivity_nativeLoadRom(
         : "ROM_ERROR: CASCADE could not load this image");
 }
 
+extern "C" JNIEXPORT jintArray JNICALL
+Java_org_cascade_android_MainActivity_nativeGetFrame(JNIEnv* env, jobject /* this */) {
+    constexpr jsize count = UI::FRAME_WIDTH * UI::FRAME_HEIGHT;
+    jintArray result = env->NewIntArray(count);
+    if (!result) return nullptr;
+    jint* pixels = new jint[count];
+    {
+        std::lock_guard<std::mutex> lock(g_coreMutex);
+        if (g_cascadeUi) {
+            g_cascadeUi->copyFrame(reinterpret_cast<uint32_t*>(pixels));
+        } else {
+            for (jsize i = 0; i < count; ++i) pixels[i] = 0xff000000;
+        }
+    }
+    env->SetIntArrayRegion(result, 0, count, pixels);
+    delete[] pixels;
+    return result;
+}
+
 extern "C" JNIEXPORT jstring JNICALL
 Java_org_cascade_android_MainActivity_nativeCoreStatus(JNIEnv* env, jobject /* this */) {
     return env->NewStringUTF(
-        "CASCADE CPU sources are linked. ROM loading is available; CPU execution, LCD rendering, and keypad integration remain unfinished.");
+        "CASCADE CPU is linked. ROM loading and CPU controls are available; LCD framebuffer is exposed to Android. Keypad integration remains unfinished.");
 }
 
 extern "C" JNIEXPORT jstring JNICALL

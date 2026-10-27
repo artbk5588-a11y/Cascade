@@ -93,7 +93,7 @@ public final class MainActivity extends Activity {
         lcdView.setScaleType(ImageView.ScaleType.FIT_CENTER);
         lcdView.setAdjustViewBounds(true);
         lcdView.setBackgroundColor(Color.BLACK);
-        root.addView(lcdView, new LinearLayout.LayoutParams(-1, 220));
+        root.addView(lcdView, new LinearLayout.LayoutParams(-1, 300));
 
         Button refresh = new Button(this);
         refresh.setText("Показать сопряжённые устройства");
@@ -124,7 +124,7 @@ public final class MainActivity extends Activity {
         root.addView(coreControls);
 
         TextView touchHint = new TextView(this);
-        touchHint.setText("Управление: тап по LCD — Ввод; свайп — перемещение. Да / Нет — ниже.");
+        touchHint.setText("Управление: тап по LCD — Ввод; свайп — перемещение. Кнопки Да / Нет / Esc.");
         root.addView(touchHint);
 
         lcdView.setOnTouchListener(new View.OnTouchListener() {
@@ -189,6 +189,23 @@ public final class MainActivity extends Activity {
             return true;
         });
         yesNoRow.addView(noButton, new LinearLayout.LayoutParams(0, -2, 1));
+
+        Button escButton = new Button(this);
+        escButton.setText("Esc");
+        escButton.setOnTouchListener((v, event) -> {
+            if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                nativeKeyEvent(1, 1005); // UIKEY_ESCAPE
+                v.setPressed(true);
+                return true;
+            } else if (event.getAction() == MotionEvent.ACTION_UP ||
+                       event.getAction() == MotionEvent.ACTION_CANCEL) {
+                nativeKeyEvent(2, 1005); // UIKEY_ESCAPE
+                v.setPressed(false);
+                return true;
+            }
+            return true;
+        });
+        yesNoRow.addView(escButton, new LinearLayout.LayoutParams(0, -2, 1));
         root.addView(yesNoRow);
 
         ScrollView devicesScroll = new ScrollView(this);

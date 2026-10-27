@@ -3,6 +3,7 @@ project(cascade_native LANGUAGES CXX)
 
 add_library(cascade_native SHARED
     native-lib.cpp
+    debug_android.cpp
     os_android.cpp
     obd_response.cpp
     cascade-core/cpu.cpp

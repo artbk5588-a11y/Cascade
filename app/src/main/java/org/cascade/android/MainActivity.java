@@ -93,7 +93,7 @@ public final class MainActivity extends Activity {
         lcdView.setScaleType(ImageView.ScaleType.FIT_CENTER);
         lcdView.setAdjustViewBounds(true);
         lcdView.setBackgroundColor(Color.BLACK);
-        root.addView(lcdView, new LinearLayout.LayoutParams(-1, 300));
+        root.addView(lcdView, new LinearLayout.LayoutParams(-1, 360));
 
         Button refresh = new Button(this);
         refresh.setText("Показать сопряжённые устройства");
@@ -141,12 +141,23 @@ public final class MainActivity extends Activity {
                     float dx = event.getX() - downX;
                     float dy = event.getY() - downY;
                     float threshold = SWIPE_DISTANCE_DP * getResources().getDisplayMetrics().density;
-                    int keyCode = 1004; // UIKEY_RETURN
+                    int keyCode;
                     if (Math.abs(dx) > threshold || Math.abs(dy) > threshold) {
+                        // A swipe moves one step in the corresponding direction.
                         if (Math.abs(dx) > Math.abs(dy))
                             keyCode = dx < 0 ? 1008 : 1009; // LEFT / RIGHT
                         else
                             keyCode = dy < 0 ? 1006 : 1007; // UP / DOWN
+                    } else {
+                        // The core has keyboard input, not a mouse pointer. Use
+                        // screen edge zones for navigation and the center to confirm.
+                        float x = event.getX() / Math.max(1f, view.getWidth());
+                        float y = event.getY() / Math.max(1f, view.getHeight());
+                        if (x < 0.22f) keyCode = 1008;       // LEFT
+                        else if (x > 0.78f) keyCode = 1009;  // RIGHT
+                        else if (y < 0.22f) keyCode = 1006;  // UP
+                        else if (y > 0.78f) keyCode = 1007;  // DOWN
+                        else keyCode = 1004;                 // RETURN / select
                     }
                     pressGestureKey(keyCode, 140);
                     return true;

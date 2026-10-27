@@ -107,7 +107,10 @@ public final class MainActivity extends Activity {
     }
 
     private void requestAndList() {
-        if (Build.VERSION.SDK_INT >= 31 && getApplicationInfo().targetSdkVersion >= 31 &&
+        // Some vendor Android builds enforce BLUETOOTH_CONNECT even when the
+        // app targets API 28. Request it on Android 12+ based on OS version,
+        // not targetSdkVersion, before calling getBondedDevices().
+        if (Build.VERSION.SDK_INT >= 31 &&
             checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT}, REQ_BT);
             return;

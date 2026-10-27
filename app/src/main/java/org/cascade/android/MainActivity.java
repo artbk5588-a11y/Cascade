@@ -28,6 +28,12 @@ import java.util.concurrent.Executors;
  * not integrated yet; this screen validates the Bluetooth command channel.
  */
 public final class MainActivity extends Activity {
+    static {
+        System.loadLibrary("cascade_native");
+    }
+
+    private native String nativeCoreStatus();
+    private native String nativeValidatePid00(String response);
     private static final int REQ_BT = 40;
     private static final UUID SPP = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
     private volatile BluetoothSocket socket;
@@ -81,6 +87,8 @@ public final class MainActivity extends Activity {
         logScroll.addView(log);
         root.addView(logScroll, new LinearLayout.LayoutParams(-1, 0, 3));
         setContentView(root);
+        appendLog("Native: " + nativeCoreStatus());
+        appendLog("Native parser self-test: " + nativeValidatePid00("41 00 98 3B 80 11"));
         requestAndList();
     }
 

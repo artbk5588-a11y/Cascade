@@ -7,7 +7,19 @@ android {
         applicationId 'org.cascade.android'
         minSdk 23
         targetSdk 28
-        versionCode 1
-        versionName '0.1-spp-prototype'
+        versionCode 2
+        versionName '0.2-native-bridge'
+        externalNativeBuild {
+            cmake {
+                cppFlags '-std=c++17'
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path 'src/main/cpp/CMakeLists.txt'
+            version '3.22.1'
+        }
     }
 }

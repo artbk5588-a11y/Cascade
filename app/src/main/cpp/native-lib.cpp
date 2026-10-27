@@ -78,6 +78,7 @@ Java_org_cascade_android_MainActivity_nativeLoadRom(
     if (!g_cascadeUi) g_cascadeUi = new UI();
     if (!g_cascadeCpu) g_cascadeCpu = new Cpu(g_cascadeUi);
     const bool loaded = g_cascadeCpu->loadRom(path);
+    if (loaded) g_cascadeCpu->reset();
     g_romLoaded = loaded;
     env->ReleaseStringUTFChars(pathValue, path);
     return env->NewStringUTF(loaded

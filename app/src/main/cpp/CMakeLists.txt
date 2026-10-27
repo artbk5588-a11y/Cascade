@@ -4,6 +4,15 @@ project(cascade_native LANGUAGES CXX)
 add_library(cascade_native SHARED
     native-lib.cpp
     obd_response.cpp
+    cascade-core/cpu.cpp
+    cascade-core/cpu_emu.cpp
+    cascade-core/cpu_io.cpp
+    cascade-core/eeprom.cpp
+    cascade-core/hsio.cpp
+    cascade-core/keypad.cpp
+    cascade-core/lcd.cpp
+    cascade-core/hints.cpp
+    cascade-core/iface_fake.cpp
 )
 
 target_compile_features(cascade_native PRIVATE cxx_std_17)

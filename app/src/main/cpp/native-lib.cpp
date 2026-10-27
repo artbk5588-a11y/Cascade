@@ -28,5 +28,5 @@ Java_org_cascade_android_MainActivity_nativeValidatePid00(
 extern "C" JNIEXPORT jstring JNICALL
 Java_org_cascade_android_MainActivity_nativeCoreStatus(JNIEnv* env, jobject /* this */) {
     return env->NewStringUTF(
-        "NDK/JNI active; original CASCADE CPU core is not linked yet");
+        "CASCADE CPU emulator is compiled into libcascade_native; ROM loading and Android LCD/keypad integration are not implemented yet");
 }

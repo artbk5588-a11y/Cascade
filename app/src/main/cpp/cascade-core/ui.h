@@ -51,7 +51,7 @@ public:
   void* getPixels() { return framebuffer.data(); }
   void lockFrame() { frameMutex.lock(); }
   void unlockFrame() { frameMutex.unlock(); }
-  void copyFrame(uint16_t* destination) {
+  void copyFrame(uint32_t* destination) {
     std::lock_guard<std::mutex> lock(frameMutex);
     for (size_t i = 0; i < framebuffer.size(); ++i)
       destination[i] = framebuffer[i] ? 0xffffffffu : 0xff000000u;

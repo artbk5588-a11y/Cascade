@@ -172,6 +172,7 @@ void Lcd::update()
     uint16_t *pp = (uint16_t *)ui->getPixels();
     if (!pp)	/* painting disabled */
       return;
+    ui->lockFrame();
     dirty = false;
     
     int i, j, lc;
@@ -210,6 +211,7 @@ void Lcd::update()
     memcpy(pp, pp - display_x, DST_WIDTH * 2);
 #endif
     ui->setDirty();
+    ui->unlockFrame();
   }
   ui->flip();
 }

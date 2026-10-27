@@ -123,45 +123,73 @@ public final class MainActivity extends Activity {
         coreControls.addView(stopCore, new LinearLayout.LayoutParams(0, -2, 1));
         root.addView(coreControls);
 
-        TextView keypadTitle = new TextView(this);
-        keypadTitle.setText("Клавиатура CASCADE");
-        keypadTitle.setTextSize(17);
-        root.addView(keypadTitle);
-        String[][] keypadRows = {
-            {"↑:1006", "←:1008", "↓:1007", "→:1009"},
-            {"1:49", "2:50", "3:51", "Да:121", "Нет:110"},
-            {"4:52", "5:53", "6:54", "Назад:1010", "Подсветка:98"},
-            {"7:55", "8:56", "9:57", "Ввод:1004"},
-            {"0:48", "Esc:1005", "Shift:1001", "F1:1011", "F2:1012"}
-        };
-        for (String[] rowLabels : keypadRows) {
-            LinearLayout row = new LinearLayout(this);
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            for (String item : rowLabels) {
-                String[] parts = item.split(":");
-                String label = parts[0];
-                int code = Integer.parseInt(parts[1]);
-                Button key = new Button(this);
-                key.setText(label);
-                key.setTextSize(12);
-                key.setPadding(2, 0, 2, 0);
-                key.setOnTouchListener((v, event) -> {
-                    if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                        nativeKeyEvent(1, code);
-                        v.setPressed(true);
-                        return true;
-                    } else if (event.getAction() == MotionEvent.ACTION_UP ||
-                               event.getAction() == MotionEvent.ACTION_CANCEL) {
-                        nativeKeyEvent(2, code);
-                        v.setPressed(false);
-                        return true;
-                    }
+        TextView touchHint = new TextView(this);
+        touchHint.setText("Управление: тап по LCD — Ввод; свайп — перемещение. Да / Нет — ниже.");
+        root.addView(touchHint);
+
+        lcdView.setOnTouchListener(new View.OnTouchListener() {
+            private float downX, downY;
+            private static final int SWIPE_DISTANCE_DP = 28;
+
+            @Override public boolean onTouch(View view, MotionEvent event) {
+                if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                    downX = event.getX();
+                    downY = event.getY();
                     return true;
-                });
-                row.addView(key, new LinearLayout.LayoutParams(0, 42, 1));
+                }
+                if (event.getAction() == MotionEvent.ACTION_UP) {
+                    float dx = event.getX() - downX;
+                    float dy = event.getY() - downY;
+                    float threshold = SWIPE_DISTANCE_DP * getResources().getDisplayMetrics().density;
+                    int keyCode = 1004; // UIKEY_RETURN
+                    if (Math.abs(dx) > threshold || Math.abs(dy) > threshold) {
+                        if (Math.abs(dx) > Math.abs(dy))
+                            keyCode = dx < 0 ? 1008 : 1009; // LEFT / RIGHT
+                        else
+                            keyCode = dy < 0 ? 1006 : 1007; // UP / DOWN
+                    }
+                    pressGestureKey(keyCode, 140);
+                    return true;
+                }
+                return true;
             }
-            root.addView(row);
-        }
+        });
+
+        LinearLayout yesNoRow = new LinearLayout(this);
+        Button yesButton = new Button(this);
+        yesButton.setText("Да");
+        yesButton.setOnTouchListener((v, event) -> {
+            if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                nativeKeyEvent(1, 121);
+                v.setPressed(true);
+                return true;
+            } else if (event.getAction() == MotionEvent.ACTION_UP ||
+                       event.getAction() == MotionEvent.ACTION_CANCEL) {
+                nativeKeyEvent(2, 121);
+                v.setPressed(false);
+                return true;
+            }
+            return true;
+        });
+        yesNoRow.addView(yesButton, new LinearLayout.LayoutParams(0, -2, 1));
+
+        Button noButton = new Button(this);
+        noButton.setText("Нет");
+        noButton.setOnTouchListener((v, event) -> {
+            if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                nativeKeyEvent(1, 110);
+                v.setPressed(true);
+                return true;
+            } else if (event.getAction() == MotionEvent.ACTION_UP ||
+                       event.getAction() == MotionEvent.ACTION_CANCEL) {
+                nativeKeyEvent(2, 110);
+                v.setPressed(false);
+                return true;
+            }
+            return true;
+        });
+        yesNoRow.addView(noButton, new LinearLayout.LayoutParams(0, -2, 1));
+        root.addView(yesNoRow);
 
         ScrollView devicesScroll = new ScrollView(this);
         deviceList = new LinearLayout(this);
@@ -217,6 +245,11 @@ public final class MainActivity extends Activity {
                 appendLog("Ошибка чтения ROM: " + e.getClass().getSimpleName() + ": " + e.getMessage());
             }
         }, "cascade-rom-loader").start();
+    }
+
+    private void pressGestureKey(int keyCode, long durationMs) {
+        nativeKeyEvent(1, keyCode);
+        lcdHandler.postDelayed(() -> nativeKeyEvent(2, keyCode), durationMs);
     }
 
     private void addCommandButton(LinearLayout row, String label, String command) {

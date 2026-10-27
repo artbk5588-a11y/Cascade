@@ -132,7 +132,7 @@ Cpu::~Cpu()
     free((uint8_t *)exrom);
   if (exrom_name)
     free(exrom_name);
-  delete ram;
+  delete[] ram;
 #ifndef NDEBUG
   if (mem_profile)
     free(mem_profile);

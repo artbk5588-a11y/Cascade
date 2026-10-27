@@ -8,6 +8,7 @@
 
 #include <cstdint>
 #include <array>
+#include <mutex>
 #include "cpu.h"
 
 class Serial;
@@ -48,6 +49,13 @@ public:
   void flip() {}
   void setDirty() {}
   void* getPixels() { return framebuffer.data(); }
+  void lockFrame() { frameMutex.lock(); }
+  void unlockFrame() { frameMutex.unlock(); }
+  void copyFrame(uint16_t* destination) {
+    std::lock_guard<std::mutex> lock(frameMutex);
+    for (size_t i = 0; i < framebuffer.size(); ++i)
+      destination[i] = framebuffer[i] ? 0xffffffffu : 0xff000000u;
+  }
   int screenX() { return 0; }
   int screenY() { return 0; }
   // Lcd::update treats screenStep() as a stride in uint16_t pixels.
@@ -57,6 +65,7 @@ public:
   const uint16_t* framePixels() const { return framebuffer.data(); }
 private:
   std::array<uint16_t, FRAME_WIDTH * FRAME_HEIGHT> framebuffer{};
+  std::mutex frameMutex;
 public:
   void setLED(int, bool) {}
   void setHint(int) {}

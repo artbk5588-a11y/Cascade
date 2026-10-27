@@ -1,12 +1,13 @@
 /*
  * Android headless UI shim for CASCADE core compilation.
  * Changes made 2026-10-28. Original CASCADE source remains under CasPL 1.0.
- * This shim deliberately provides no desktop rendering or ROM picker.
+ * The framebuffer matches the upstream LCD scaler output (480 x 360 pixels).
  */
 #ifndef CASCADE_ANDROID_UI_SHIM_H
 #define CASCADE_ANDROID_UI_SHIM_H
 
 #include <cstdint>
+#include <array>
 #include "cpu.h"
 
 class Serial;
@@ -46,10 +47,17 @@ public:
   bool pollEvent(Event&) { return false; }
   void flip() {}
   void setDirty() {}
-  void* getPixels() { return nullptr; }
-  int screenX() { return 800; }
-  int screenY() { return 480; }
-  int screenStep() { return 800 * 4; }
+  void* getPixels() { return framebuffer.data(); }
+  int screenX() { return 0; }
+  int screenY() { return 0; }
+  // Lcd::update treats screenStep() as a stride in uint16_t pixels.
+  int screenStep() { return 480; }
+  static constexpr int FRAME_WIDTH = 480;
+  static constexpr int FRAME_HEIGHT = 360;
+  const uint16_t* framePixels() const { return framebuffer.data(); }
+private:
+  std::array<uint16_t, FRAME_WIDTH * FRAME_HEIGHT> framebuffer{};
+public:
   void setLED(int, bool) {}
   void setHint(int) {}
   void clearHint(int) {}

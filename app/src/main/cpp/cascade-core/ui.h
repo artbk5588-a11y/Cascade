@@ -25,6 +25,8 @@ class UI {
 public:
   UI() = default;
   void setSerial(Serial*) {}
+  void setBaudrate(int, int) {}
+  void setCommLine(int) {}
   bool pollEvent(Event&) { return false; }
   void flip() {}
   void setDirty() {}

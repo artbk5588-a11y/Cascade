@@ -18,6 +18,7 @@
 #include "hsio.h"
 #include "hints.h"
 #include <string.h>
+#include <unistd.h>
 
 Cpu::Cpu(UI *ui)
 {
@@ -298,7 +299,7 @@ uint32_t Cpu::virtToPhysSlow(uint16_t addr, int fetch)
   else {
     char buf[256];
     sprintf(buf, "Unimplemented memory mapping. (%02X/%02X)\nThe system will reset now.", map_hi, map_lo);
-    ERROR(buf);
+    ERROR("%s", buf);
 #ifndef NDEBUG
     dumpMem();
     exit(1);

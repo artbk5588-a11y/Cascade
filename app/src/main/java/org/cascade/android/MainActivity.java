@@ -24,8 +24,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Android SPP and ELM327 transport bring-up. The CASCADE CPU/emulator core is
- * not integrated yet; this screen validates the Bluetooth command channel.
+ * Android prototype. The CASCADE CPU sources are compiled into the native library,
+ * but the ROM, LCD rendering, keypad, and emulator lifecycle are not integrated yet.
  */
 public final class MainActivity extends Activity {
     static {

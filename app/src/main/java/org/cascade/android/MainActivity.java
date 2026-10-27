@@ -38,6 +38,8 @@ public final class MainActivity extends Activity {
 
     private native String nativeCoreStatus();
     private native String nativeLoadRom(String path);
+    private native String nativeStartEmulation();
+    private native String nativeStopEmulation();
     private static final int REQ_ROM = 41;
     private native String nativeValidatePid00(String response);
     private static final int REQ_BT = 40;
@@ -73,6 +75,19 @@ public final class MainActivity extends Activity {
         });
         root.addView(chooseRom);
 
+        LinearLayout coreControls = new LinearLayout(this);
+        Button startCore = new Button(this);
+        startCore.setText("Запустить CASCADE");
+        startCore.setOnClickListener(v -> new Thread(() ->
+                appendLog(nativeStartEmulation()), "cascade-core-start").start());
+        coreControls.addView(startCore, new LinearLayout.LayoutParams(0, -2, 1));
+        Button stopCore = new Button(this);
+        stopCore.setText("Остановить CASCADE");
+        stopCore.setOnClickListener(v -> new Thread(() ->
+                appendLog(nativeStopEmulation()), "cascade-core-stop").start());
+        coreControls.addView(stopCore, new LinearLayout.LayoutParams(0, -2, 1));
+        root.addView(coreControls);
+
         ScrollView devicesScroll = new ScrollView(this);
         deviceList = new LinearLayout(this);
         deviceList.setOrientation(LinearLayout.VERTICAL);
@@ -97,7 +112,7 @@ public final class MainActivity extends Activity {
         root.addView(disconnect);
 
         log = new TextView(this);
-        log.setText("Ядро CASCADE собрано в native-библиотеку. Можно выбрать ROM и проверить загрузку; запуск CPU, экран LCD и клавиатура Android ещё не подключены.\n\nBluetooth/ELM327 здесь пока отдельный транспортный тест.\n");
+        log.setText("Ядро CASCADE собрано в native-библиотеку. Можно загрузить ROM и запустить CPU CASCADE через встроенный тестовый диагностический интерфейс. Экран LCD и клавиатура Android ещё не подключены.\n\nBluetooth/ELM327 здесь пока отдельный транспортный тест.\n");
         log.setTextIsSelectable(true);
         ScrollView logScroll = new ScrollView(this);
         logScroll.addView(log);

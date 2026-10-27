@@ -18,5 +18,5 @@ add_library(cascade_native SHARED
 )
 
 target_compile_features(cascade_native PRIVATE cxx_std_17)
-target_compile_options(cascade_native PRIVATE -Wall -Wextra)
+target_compile_options(cascade_native PRIVATE -Wall -Wextra -Wno-error=format-security)
 target_link_libraries(cascade_native log)

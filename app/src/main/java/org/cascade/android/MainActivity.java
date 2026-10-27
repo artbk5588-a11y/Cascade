@@ -13,6 +13,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.View;
+import android.view.MotionEvent;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ImageView;
@@ -34,7 +35,7 @@ import java.util.concurrent.Executors;
 
 /**
  * Android prototype. The CASCADE CPU sources are compiled into the native library,
- * ROM loading, CPU controls, and LCD framebuffer rendering are integrated; keypad remains pending.
+ * ROM loading, CPU controls, LCD framebuffer rendering, and touchscreen keypad events are integrated.
  */
 public final class MainActivity extends Activity {
     static {
@@ -46,6 +47,7 @@ public final class MainActivity extends Activity {
     private native String nativeStartEmulation();
     private native String nativeStopEmulation();
     private native int[] nativeGetFrame();
+    private native void nativeKeyEvent(int type, int keyCode);
     private static final int REQ_ROM = 41;
     private native String nativeValidatePid00(String response);
     private static final int REQ_BT = 40;
@@ -121,6 +123,46 @@ public final class MainActivity extends Activity {
         coreControls.addView(stopCore, new LinearLayout.LayoutParams(0, -2, 1));
         root.addView(coreControls);
 
+        TextView keypadTitle = new TextView(this);
+        keypadTitle.setText("Клавиатура CASCADE");
+        keypadTitle.setTextSize(17);
+        root.addView(keypadTitle);
+        String[][] keypadRows = {
+            {"↑:1006", "←:1008", "↓:1007", "→:1009"},
+            {"1:49", "2:50", "3:51", "Да:121", "Нет:110"},
+            {"4:52", "5:53", "6:54", "Назад:1010", "Подсветка:98"},
+            {"7:55", "8:56", "9:57", "Ввод:1004"},
+            {"0:48", "Esc:1005", "Shift:1001", "F1:1011", "F2:1012"}
+        };
+        for (String[] rowLabels : keypadRows) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            for (String item : rowLabels) {
+                String[] parts = item.split(":");
+                String label = parts[0];
+                int code = Integer.parseInt(parts[1]);
+                Button key = new Button(this);
+                key.setText(label);
+                key.setTextSize(12);
+                key.setPadding(2, 0, 2, 0);
+                key.setOnTouchListener((v, event) -> {
+                    if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                        nativeKeyEvent(1, code);
+                        v.setPressed(true);
+                        return true;
+                    } else if (event.getAction() == MotionEvent.ACTION_UP ||
+                               event.getAction() == MotionEvent.ACTION_CANCEL) {
+                        nativeKeyEvent(2, code);
+                        v.setPressed(false);
+                        return true;
+                    }
+                    return true;
+                });
+                row.addView(key, new LinearLayout.LayoutParams(0, 42, 1));
+            }
+            root.addView(row);
+        }
+
         ScrollView devicesScroll = new ScrollView(this);
         deviceList = new LinearLayout(this);
         deviceList.setOrientation(LinearLayout.VERTICAL);
@@ -145,7 +187,7 @@ public final class MainActivity extends Activity {
         root.addView(disconnect);
 
         log = new TextView(this);
-        log.setText("Ядро CASCADE собрано в native-библиотеку. Выберите ROM, запустите CPU и наблюдайте LCD выше. Клавиатура Android ещё не подключена.\n\nBluetooth/ELM327 здесь пока отдельный транспортный тест.\n");
+        log.setText("Ядро CASCADE собрано в native-библиотеку. Выберите ROM, запустите CPU и наблюдайте LCD выше. Сенсорная клавиатура CASCADE доступна ниже экрана.\n\nBluetooth/ELM327 здесь пока отдельный транспортный тест.\n");
         log.setTextIsSelectable(true);
         ScrollView logScroll = new ScrollView(this);
         logScroll.addView(log);
@@ -154,6 +196,7 @@ public final class MainActivity extends Activity {
         appendLog("Native: " + nativeCoreStatus());
         appendLog("Native parser self-test: " + nativeValidatePid00("41 00 98 3B 80 11"));
         requestAndList();
+        lcdHandler.post(lcdRefresh);
     }
 
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
@@ -289,6 +332,10 @@ public final class MainActivity extends Activity {
     }
 
     @Override protected void onDestroy() {
+        lcdHandler.removeCallbacks(lcdRefresh);
+        new Thread(() -> nativeStopEmulation(), "cascade-core-shutdown").start();
+        lcdView = null;
+        lcdBitmap = null;
         closeSocket();
         sender.shutdownNow();
         super.onDestroy();

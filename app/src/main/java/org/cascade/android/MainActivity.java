@@ -6,6 +6,8 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
 import android.content.pm.PackageManager;
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
@@ -15,6 +17,8 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 import java.io.IOException;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
@@ -33,6 +37,8 @@ public final class MainActivity extends Activity {
     }
 
     private native String nativeCoreStatus();
+    private native String nativeLoadRom(String path);
+    private static final int REQ_ROM = 41;
     private native String nativeValidatePid00(String response);
     private static final int REQ_BT = 40;
     private static final UUID SPP = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
@@ -56,6 +62,16 @@ public final class MainActivity extends Activity {
         refresh.setText("Показать сопряжённые устройства");
         refresh.setOnClickListener(v -> requestAndList());
         root.addView(refresh);
+
+        Button chooseRom = new Button(this);
+        chooseRom.setText("Выбрать ROM CASCADE");
+        chooseRom.setOnClickListener(v -> {
+            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+            intent.setType("*/*");
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
+            startActivityForResult(intent, REQ_ROM);
+        });
+        root.addView(chooseRom);
 
         ScrollView devicesScroll = new ScrollView(this);
         deviceList = new LinearLayout(this);
@@ -81,7 +97,7 @@ public final class MainActivity extends Activity {
         root.addView(disconnect);
 
         log = new TextView(this);
-        log.setText("Ядро эмулятора CASCADE собрано в native-библиотеку. Загрузка ROM, экран LCD и клавиатура Android ещё не подключены.\n\nBluetooth/ELM327 здесь пока отдельный транспортный тест.\n");
+        log.setText("Ядро CASCADE собрано в native-библиотеку. Можно выбрать ROM и проверить загрузку; запуск CPU, экран LCD и клавиатура Android ещё не подключены.\n\nBluetooth/ELM327 здесь пока отдельный транспортный тест.\n");
         log.setTextIsSelectable(true);
         ScrollView logScroll = new ScrollView(this);
         logScroll.addView(log);
@@ -90,6 +106,26 @@ public final class MainActivity extends Activity {
         appendLog("Native: " + nativeCoreStatus());
         appendLog("Native parser self-test: " + nativeValidatePid00("41 00 98 3B 80 11"));
         requestAndList();
+    }
+
+    @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQ_ROM || resultCode != RESULT_OK || data == null || data.getData() == null) return;
+        Uri uri = data.getData();
+        new Thread(() -> {
+            File imported = new File(getCacheDir(), "cascade-selected-rom.bin");
+            try (java.io.InputStream in = getContentResolver().openInputStream(uri);
+                 FileOutputStream out = new FileOutputStream(imported)) {
+                if (in == null) throw new IOException("Не удалось открыть выбранный файл");
+                byte[] buffer = new byte[8192];
+                int count;
+                while ((count = in.read(buffer)) != -1) out.write(buffer, 0, count);
+                String result = nativeLoadRom(imported.getAbsolutePath());
+                appendLog(result);
+            } catch (Exception e) {
+                appendLog("Ошибка чтения ROM: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+            }
+        }, "cascade-rom-loader").start();
     }
 
     private void addCommandButton(LinearLayout row, String label, String command) {

@@ -6,6 +6,7 @@ add_library(cascade_native SHARED
     debug_android.cpp
     os_android.cpp
     obd_response.cpp
+    elm_bridge_protocol.cpp
     cascade-core/cpu.cpp
     cascade-core/cpu_emu.cpp
     cascade-core/cpu_io.cpp

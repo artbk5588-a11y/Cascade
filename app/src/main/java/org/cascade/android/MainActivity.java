@@ -356,14 +356,49 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private BluetoothSocket openSppSocket(BluetoothDevice device) throws Exception {
+        Exception last = null;
+        // Automotive vendor stacks can fail the secure UUID-based RFCOMM path
+        // even for paired adapters. Try secure UUID, insecure UUID, then channel 1.
+        try {
+            BluetoothSocket s = device.createRfcommSocketToServiceRecord(SPP);
+            s.connect();
+            appendLog("SPP: secure UUID подключён");
+            return s;
+        } catch (Exception e) {
+            last = e;
+            appendLog("SPP secure UUID: " + e.getClass().getSimpleName());
+        }
+        try {
+            BluetoothSocket s = device.createInsecureRfcommSocketToServiceRecord(SPP);
+            s.connect();
+            appendLog("SPP: insecure UUID подключён");
+            return s;
+        } catch (Exception e) {
+            last = e;
+            appendLog("SPP insecure UUID: " + e.getClass().getSimpleName());
+        }
+        try {
+            java.lang.reflect.Method method = device.getClass().getMethod("createRfcommSocket", int.class);
+            BluetoothSocket s = (BluetoothSocket) method.invoke(device, 1);
+            s.connect();
+            appendLog("SPP: RFCOMM channel 1 подключён");
+            return s;
+        } catch (Exception e) {
+            last = e;
+            appendLog("SPP channel 1: " + e.getClass().getSimpleName() +
+                    (e.getCause() != null ? ": " + e.getCause().getMessage() : ""));
+        }
+        throw last;
+    }
+
     private void connect(BluetoothDevice device) {
         closeSocket();
         appendLog("Подключение SPP: " + device.getAddress());
         new Thread(() -> {
             BluetoothSocket candidate = null;
             try {
-                candidate = device.createRfcommSocketToServiceRecord(SPP);
-                candidate.connect();
+                candidate = openSppSocket(device);
                 socket = candidate;
                 socketInput = candidate.getInputStream();
                 socketOutput = candidate.getOutputStream();
@@ -390,9 +425,10 @@ public final class MainActivity extends Activity {
                         }
                     }
                 }
+                appendLog("SPP соединение завершено");
             } catch (Exception e) {
                 if (candidate != null) try { candidate.close(); } catch (IOException ignored) {}
-                appendLog("Ошибка SPP: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+                appendLog("Ошибка SPP после всех способов: " + e.getClass().getSimpleName() + ": " + e.getMessage());
             }
         }, "cascade-spp-connect").start();
     }

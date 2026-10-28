@@ -72,9 +72,10 @@ bool responseToFrame(const std::string& response, uint8_t requestedPid,
             continue;
         cleaned.push_back(static_cast<char>(std::toupper(static_cast<unsigned char>(c))));
     }
-    if (cleaned.find("SEARCHING...") != std::string::npos) {
-        const size_t pos = cleaned.rfind("SEARCHING...");
-        cleaned.erase(pos, std::string::npos);
+    const std::string searching = "SEARCHING...";
+    size_t searchingPos = 0;
+    while ((searchingPos = cleaned.find(searching, searchingPos)) != std::string::npos) {
+        cleaned.erase(searchingPos, searching.size());
     }
     std::vector<uint8_t> bytes;
     if (!parseHexBytes(cleaned, &bytes) || bytes.size() < 3 ||

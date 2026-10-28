@@ -73,17 +73,22 @@ bool responseToFrame(const std::string& response, uint8_t requestedPid,
         cleaned.erase(searchingPos, searching.size());
     }
     std::vector<uint8_t> bytes;
-    if (!parseHexBytes(cleaned, &bytes) || bytes.size() < 3 ||
-        bytes[0] != 0x41 || bytes[1] != requestedPid) {
-        return false;
+    if (!parseHexBytes(cleaned, &bytes) || bytes.size() < 3) return false;
+    // If ELM echo is still enabled, the response may contain the command bytes
+    // before the actual 41 <PID> payload. Start at the positive response header.
+    size_t payload = bytes.size();
+    for (size_t i = 0; i + 2 < bytes.size(); ++i) {
+        if (bytes[i] == 0x41 && bytes[i + 1] == requestedPid) {
+            payload = i;
+            break;
+        }
     }
+    if (payload == bytes.size()) return false;
     frame->clear();
     frame->push_back(0x48);
     frame->push_back(0x6b);
     frame->push_back(0x12);
-    frame->push_back(bytes[0]);
-    frame->push_back(bytes[1]);
-    frame->insert(frame->end(), bytes.begin() + 2, bytes.end());
+    frame->insert(frame->end(), bytes.begin() + payload, bytes.end());
     return true;
 }
 } // namespace cascade_elm

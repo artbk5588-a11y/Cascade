@@ -1,7 +1,7 @@
 #ifndef CASCADE_IFACE_ELM_H
 #define CASCADE_IFACE_ELM_H
 
-#include "interface.h"
+#include "cascade-core/interface.h"
 #include <cstdint>
 #include <mutex>
 #include <string>

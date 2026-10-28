@@ -331,10 +331,16 @@ public final class MainActivity extends Activity {
         // Some vendor Android builds enforce BLUETOOTH_CONNECT even when the
         // app targets API 28. Request it on Android 12+ based on OS version,
         // not targetSdkVersion, before calling getBondedDevices().
-        if (Build.VERSION.SDK_INT >= 31 &&
-            checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT}, REQ_BT);
-            return;
+        if (Build.VERSION.SDK_INT >= 31) {
+            java.util.ArrayList<String> missing = new java.util.ArrayList<>();
+            if (checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED)
+                missing.add(Manifest.permission.BLUETOOTH_CONNECT);
+            if (checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED)
+                missing.add(Manifest.permission.BLUETOOTH_SCAN);
+            if (!missing.isEmpty()) {
+                requestPermissions(missing.toArray(new String[0]), REQ_BT);
+                return;
+            }
         }
         deviceList.removeAllViews();
         BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
@@ -572,7 +578,9 @@ public final class MainActivity extends Activity {
     @Override public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(code, permissions, results);
         if (code == REQ_BT) {
-            if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) requestAndList();
+            boolean allGranted = results.length > 0;
+            for (int result : results) allGranted &= result == PackageManager.PERMISSION_GRANTED;
+            if (allGranted) requestAndList();
             else Toast.makeText(this, "Нужно разрешение Bluetooth", Toast.LENGTH_LONG).show();
         }
     }

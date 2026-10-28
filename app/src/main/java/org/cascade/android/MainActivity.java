@@ -267,7 +267,7 @@ public final class MainActivity extends Activity {
         root.addView(disconnect);
 
         log = new TextView(this);
-        log.setText("Ядро CASCADE собрано в native-библиотеку. Выберите ROM, запустите CPU и наблюдайте LCD выше. Сенсорная клавиатура CASCADE доступна ниже экрана.\n\nBluetooth/ELM327 здесь пока отдельный транспортный тест.\n");
+        log.setText("Ядро CASCADE собрано в native-библиотеку. Выберите ROM, запустите CPU и наблюдайте LCD выше. Сенсорная клавиатура CASCADE доступна ниже экрана.\n\nBluetooth/ELM327 используется ядром CASCADE для поддерживаемых запросов Mode 01; сначала подключи адаптер SPP и запусти ядро.\n");
         log.setTextIsSelectable(true);
         ScrollView logScroll = new ScrollView(this);
         logScroll.addView(log);

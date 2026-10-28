@@ -356,39 +356,66 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private String describeBtError(Exception e) {
+        StringBuilder message = new StringBuilder();
+        Throwable t = e;
+        int depth = 0;
+        while (t != null && depth++ < 5) {
+            if (message.length() > 0) message.append(" <- ");
+            message.append(t.getClass().getSimpleName());
+            if (t.getMessage() != null && !t.getMessage().isEmpty())
+                message.append(": ").append(t.getMessage());
+            t = t.getCause();
+        }
+        return message.toString();
+    }
+
+    private BluetoothSocket trySpp(String label, SocketFactory factory) throws Exception {
+        BluetoothSocket s = null;
+        try {
+            s = factory.create();
+            s.connect();
+            appendLog("SPP подключён: " + label);
+            return s;
+        } catch (Exception e) {
+            if (s != null) try { s.close(); } catch (IOException ignored) {}
+            appendLog("SPP " + label + " ОШИБКА: " + describeBtError(e));
+            throw e;
+        }
+    }
+
+    private interface SocketFactory {
+        BluetoothSocket create() throws Exception;
+    }
+
     private BluetoothSocket openSppSocket(BluetoothDevice device) throws Exception {
+        BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+        if (adapter != null) {
+            try { adapter.cancelDiscovery(); } catch (Exception e) {
+                appendLog("cancelDiscovery: " + describeBtError(e));
+            }
+        }
         Exception last = null;
-        // Automotive vendor stacks can fail the secure UUID-based RFCOMM path
-        // even for paired adapters. Try secure UUID, insecure UUID, then channel 1.
         try {
-            BluetoothSocket s = device.createRfcommSocketToServiceRecord(SPP);
-            s.connect();
-            appendLog("SPP: secure UUID подключён");
-            return s;
-        } catch (Exception e) {
-            last = e;
-            appendLog("SPP secure UUID: " + e.getClass().getSimpleName());
-        }
+            return trySpp("secure UUID", () -> device.createRfcommSocketToServiceRecord(SPP));
+        } catch (Exception e) { last = e; }
         try {
-            BluetoothSocket s = device.createInsecureRfcommSocketToServiceRecord(SPP);
-            s.connect();
-            appendLog("SPP: insecure UUID подключён");
-            return s;
-        } catch (Exception e) {
-            last = e;
-            appendLog("SPP insecure UUID: " + e.getClass().getSimpleName());
-        }
+            return trySpp("insecure UUID", () -> device.createInsecureRfcommSocketToServiceRecord(SPP));
+        } catch (Exception e) { last = e; }
         try {
-            java.lang.reflect.Method method = device.getClass().getMethod("createRfcommSocket", int.class);
-            BluetoothSocket s = (BluetoothSocket) method.invoke(device, 1);
-            s.connect();
-            appendLog("SPP: RFCOMM channel 1 подключён");
-            return s;
-        } catch (Exception e) {
-            last = e;
-            appendLog("SPP channel 1: " + e.getClass().getSimpleName() +
-                    (e.getCause() != null ? ": " + e.getCause().getMessage() : ""));
-        }
+            return trySpp("RFCOMM channel 1", () -> {
+                java.lang.reflect.Method method = device.getClass().getMethod("createRfcommSocket", int.class);
+                return (BluetoothSocket) method.invoke(device, 1);
+            });
+        } catch (Exception e) { last = e; }
+        // Some Android vendor builds expose the insecure channel method even when
+        // the public UUID methods are routed through a broken vendor Bluetooth stack.
+        try {
+            return trySpp("insecure channel 1", () -> {
+                java.lang.reflect.Method method = device.getClass().getMethod("createInsecureRfcommSocket", int.class);
+                return (BluetoothSocket) method.invoke(device, 1);
+            });
+        } catch (Exception e) { last = e; }
         throw last;
     }
 

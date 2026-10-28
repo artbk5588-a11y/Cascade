@@ -42,7 +42,9 @@ void IfaceElm::checkInput() {
     }
     if (state_ == RESPONSE_READY) {
         if (serial && !responseFrame_.empty()) {
-            std::vector<int> terminated = responseFrame_;
+            std::vector<int> terminated;
+            terminated.reserve(responseFrame_.size() + 1);
+            for (uint8_t byte : responseFrame_) terminated.push_back(byte);
             terminated.push_back(-1);
             serial->addRxData(terminated.data());
         }
@@ -57,22 +59,22 @@ std::string IfaceElm::pollCommand() {
     std::lock_guard<std::mutex> lock(mutex_);
     if (state_ != WAITING_RESPONSE) return std::string();
     // Mark as claimed so Java polling cannot dispatch the same request twice.
-    state_ = RESPONSE_READY;
+    state_ = COMMAND_CLAIMED;
     return pendingCommand_;
 }
 
 bool IfaceElm::submitResponse(const std::string& command, const std::string& response) {
     std::lock_guard<std::mutex> lock(mutex_);
-    if (state_ != RESPONSE_READY || command != pendingCommand_) return false;
+    if (state_ != COMMAND_CLAIMED || command != pendingCommand_) return false;
     const uint8_t pid = request_.size() > 4 ? request_[4] : 0;
-    if (!cascade_elm::responseToFrame(response, pid,
-                                      reinterpret_cast<std::vector<uint8_t>*>(&responseFrame_))) {
+    if (!cascade_elm::responseToFrame(response, pid, &responseFrame_)) {
         responseFrame_.clear();
         state_ = IDLE;
         pendingCommand_.clear();
         request_.clear();
         return false;
     }
+    state_ = RESPONSE_READY;
     return true;
 }
 

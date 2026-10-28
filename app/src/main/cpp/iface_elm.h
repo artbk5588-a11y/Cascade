@@ -27,14 +27,14 @@ public:
     bool hasPendingCommand() const;
 
 private:
-    enum State { IDLE, COMPOSING, WAITING_RESPONSE, RESPONSE_READY };
+    enum State { IDLE, COMPOSING, WAITING_RESPONSE, COMMAND_CLAIMED, RESPONSE_READY };
     Cpu* cpu_;
     uint64_t deadline_;
     int baudDivisor_;
     State state_;
     std::vector<uint8_t> request_;
     std::string pendingCommand_;
-    std::vector<int> responseFrame_;
+    std::vector<uint8_t> responseFrame_;
     mutable std::mutex mutex_;
 };
 

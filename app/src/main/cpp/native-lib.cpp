@@ -4,7 +4,7 @@
 #include <thread>
 #include <mutex>
 #include <atomic>
-#include "cascade-core/iface_fake.h"
+#include "iface_elm.h"
 
 #include "obd_response.h"
 #include "cascade-core/cpu.h"
@@ -13,7 +13,7 @@
 namespace {
 UI* g_cascadeUi = nullptr;
 Cpu* g_cascadeCpu = nullptr;
-IfaceFake* g_cascadeIface = nullptr;
+IfaceElm* g_cascadeIface = nullptr;
 std::thread g_emulationThread;
 std::mutex g_coreMutex;
 bool g_romLoaded = false;
@@ -127,7 +127,7 @@ Java_org_cascade_android_MainActivity_nativeStartEmulation(JNIEnv* env, jobject 
         return env->NewStringUTF("CORE_RUNNING: emulation is already running");
     if (g_emulationThread.joinable()) g_emulationThread.join();
     if (!g_cascadeIface) {
-        g_cascadeIface = new IfaceFake(g_cascadeCpu, g_cascadeUi);
+        g_cascadeIface = new IfaceElm(g_cascadeCpu, g_cascadeUi);
         g_cascadeCpu->setSerial(g_cascadeIface, true);
     }
     g_emulationRunning = true;
@@ -135,7 +135,7 @@ Java_org_cascade_android_MainActivity_nativeStartEmulation(JNIEnv* env, jobject 
         g_cascadeCpu->emulate();
         g_emulationRunning.store(false);
     });
-    return env->NewStringUTF("CORE_STARTING: CASCADE CPU thread started with the built-in fake diagnostic interface");
+    return env->NewStringUTF("CORE_STARTING: CASCADE CPU thread started with ELM327 bridge; connect SPP to process ECU requests");
 }
 
 extern "C" JNIEXPORT jstring JNICALL
@@ -143,4 +143,32 @@ Java_org_cascade_android_MainActivity_nativeStopEmulation(JNIEnv* env, jobject /
     std::lock_guard<std::mutex> lock(g_coreMutex);
     stopEmulationLocked();
     return env->NewStringUTF("CORE_STOPPED: CASCADE CPU thread has stopped");
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_org_cascade_android_MainActivity_nativePollElmCommand(JNIEnv* env, jobject /* this */) {
+    std::lock_guard<std::mutex> lock(g_coreMutex);
+    if (!g_cascadeIface) return env->NewStringUTF("");
+    const std::string command = g_cascadeIface->pollCommand();
+    return env->NewStringUTF(command.c_str());
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_org_cascade_android_MainActivity_nativeSubmitElmResponse(
+        JNIEnv* env, jobject /* this */, jstring commandValue, jstring responseValue) {
+    if (!commandValue || !responseValue) return JNI_FALSE;
+    const char* commandChars = env->GetStringUTFChars(commandValue, nullptr);
+    const char* responseChars = env->GetStringUTFChars(responseValue, nullptr);
+    if (!commandChars || !responseChars) {
+        if (commandChars) env->ReleaseStringUTFChars(commandValue, commandChars);
+        if (responseChars) env->ReleaseStringUTFChars(responseValue, responseChars);
+        return JNI_FALSE;
+    }
+    const std::string command(commandChars);
+    const std::string response(responseChars);
+    env->ReleaseStringUTFChars(commandValue, commandChars);
+    env->ReleaseStringUTFChars(responseValue, responseChars);
+    std::lock_guard<std::mutex> lock(g_coreMutex);
+    return g_cascadeIface && g_cascadeIface->submitResponse(command, response)
+        ? JNI_TRUE : JNI_FALSE;
 }

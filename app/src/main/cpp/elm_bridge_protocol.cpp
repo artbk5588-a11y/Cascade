@@ -32,11 +32,6 @@ bool parseHexBytes(const std::string& input, std::vector<uint8_t>* bytes) {
     return high < 0 && !bytes->empty();
 }
 
-void appendChecksum(std::vector<uint8_t>* frame) {
-    unsigned int sum = 0;
-    for (uint8_t b : *frame) sum += b;
-    frame->push_back(static_cast<uint8_t>(sum & 0xff));
-}
 } // namespace
 
 bool hasChecksum(const std::vector<uint8_t>& frame) {

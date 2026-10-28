@@ -89,7 +89,6 @@ bool responseToFrame(const std::string& response, uint8_t requestedPid,
     frame->push_back(bytes[0]);
     frame->push_back(bytes[1]);
     frame->insert(frame->end(), bytes.begin() + 2, bytes.end());
-    appendChecksum(frame);
     return true;
 }
 } // namespace cascade_elm

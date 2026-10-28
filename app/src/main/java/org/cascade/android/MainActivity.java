@@ -50,6 +50,8 @@ public final class MainActivity extends Activity {
     private native void nativeKeyEvent(int type, int keyCode);
     private static final int REQ_ROM = 41;
     private native String nativeValidatePid00(String response);
+    private native String nativePollElmCommand();
+    private native boolean nativeSubmitElmResponse(String command, String response);
     private static final int REQ_BT = 40;
     private static final UUID SPP = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
     private volatile BluetoothSocket socket;
@@ -74,6 +76,24 @@ public final class MainActivity extends Activity {
                 }
             } catch (Exception e) {
                 appendLog("Ошибка обновления LCD: " + e.getMessage());
+            }
+            lcdHandler.postDelayed(this, 100);
+        }
+    };
+
+    private final Runnable elmBridgePoll = new Runnable() {
+        @Override public void run() {
+            if (isFinishing()) return;
+            try {
+                BluetoothSocket current = socket;
+                if (current != null && current.isConnected()) {
+                    String command = nativePollElmCommand();
+                    if (command != null && !command.isEmpty()) {
+                        sender.execute(() -> exchangeBridgeCommand(command));
+                    }
+                }
+            } catch (Exception e) {
+                appendLog("ELM bridge poll error: " + e.getMessage());
             }
             lcdHandler.postDelayed(this, 100);
         }
@@ -253,6 +273,7 @@ public final class MainActivity extends Activity {
         logScroll.addView(log);
         root.addView(logScroll, new LinearLayout.LayoutParams(-1, 0, 3));
         setContentView(root);
+        lcdHandler.postDelayed(elmBridgePoll, 100);
         appendLog("Native: " + nativeCoreStatus());
         appendLog("Native parser self-test: " + nativeValidatePid00("41 00 98 3B 80 11"));
         requestAndList();
@@ -426,6 +447,50 @@ public final class MainActivity extends Activity {
         });;
     }
 
+    private void exchangeBridgeCommand(String command) {
+        BluetoothSocket current = socket;
+        if (current == null || !current.isConnected()) {
+            nativeSubmitElmResponse(command, "NO SPP CONNECTION");
+            return;
+        }
+        String response = "";
+        try {
+            OutputStream out = socketOutput;
+            if (out == null || current != socket || !current.isConnected()) {
+                nativeSubmitElmResponse(command, "SPP DISCONNECTED");
+                return;
+            }
+            synchronized (responseLock) {
+                responseBuffer.setLength(0);
+            }
+            appendLog("CASCADE → ELM: " + command);
+            out.write((command + "\r").getBytes(StandardCharsets.US_ASCII));
+            out.flush();
+            long deadline = System.currentTimeMillis() + 5000;
+            synchronized (responseLock) {
+                while (current == socket && current.isConnected() &&
+                       responseBuffer.length() == 0 && System.currentTimeMillis() < deadline) {
+                    long remaining = deadline - System.currentTimeMillis();
+                    if (remaining > 0) responseLock.wait(remaining);
+                }
+                if (responseBuffer.length() > 0) {
+                    response = responseBuffer.toString().trim();
+                    responseBuffer.setLength(0);
+                }
+            }
+            if (response.isEmpty()) response = "ELM TIMEOUT";
+            appendLog("CASCADE ← ELM (" + command + "): " + response.replace("\n", " | "));
+            boolean accepted = nativeSubmitElmResponse(command, response);
+            if (!accepted) appendLog("ELM bridge: ответ не распознан или запрос не поддержан");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            nativeSubmitElmResponse(command, "ELM INTERRUPTED");
+        } catch (Exception e) {
+            nativeSubmitElmResponse(command, "ELM ERROR");
+            appendLog("ELM bridge error: " + e.getMessage());
+        }
+    }
+
     private void closeSocket() {
         BluetoothSocket current = socket;
         socket = null;
@@ -451,6 +516,7 @@ public final class MainActivity extends Activity {
 
     @Override protected void onDestroy() {
         lcdHandler.removeCallbacks(lcdRefresh);
+        lcdHandler.removeCallbacks(elmBridgePoll);
         new Thread(() -> nativeStopEmulation(), "cascade-core-shutdown").start();
         lcdView = null;
         lcdBitmap = null;

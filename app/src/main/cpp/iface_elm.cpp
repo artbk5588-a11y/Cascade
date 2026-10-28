@@ -5,7 +5,7 @@
 #include "elm_bridge_protocol.h"
 
 IfaceElm::IfaceElm(Cpu* cpu, UI* ui)
-    : Interface(ui), cpu_(cpu), deadline_(0), baudDivisor_(0), state_(IDLE) {
+    : Interface(ui), cpu_(cpu), deadline_(0), baudDivisor_(0), slowInitTarget_(0), slowInitCheckByte_(0), state_(IDLE) {
     ui->setPort("ELM327 SPP");
 }
 
@@ -18,6 +18,12 @@ void IfaceElm::setBaudDivisor(int divisor) {
 
 void IfaceElm::sendByte(uint8_t byte) {
     std::lock_guard<std::mutex> lock(mutex_);
+    if (state_ == SI_WAIT_CHECK) {
+        slowInitCheckByte_ = byte;
+        state_ = SI_CHECK_RECEIVED;
+        deadline_ = cpu_->getCycles() + 1000;
+        return;
+    }
     if (state_ == IDLE && (baudDivisor_ == 0x77 || baudDivisor_ == 0x76 || baudDivisor_ == 0x81)) {
         request_.clear();
         request_.push_back(byte);
@@ -31,6 +37,26 @@ void IfaceElm::sendByte(uint8_t byte) {
 
 void IfaceElm::checkInput() {
     std::lock_guard<std::mutex> lock(mutex_);
+    if (cpu_->getCycles() < deadline_) return;
+    if (state_ == SI_WAIT_55) {
+        if (serial) serial->addRxData(static_cast<uint8_t>(0x55));
+        state_ = SI_WAIT_KEYWORDS;
+        deadline_ = cpu_->getCycles() + 6ULL * 10000ULL;
+        return;
+    }
+    if (state_ == SI_WAIT_KEYWORDS) {
+        if (serial) {
+            const int keywords[] = {0x08, 0x08, -1};
+            serial->addRxData(keywords);
+        }
+        state_ = SI_WAIT_CHECK;
+        return;
+    }
+    if (state_ == SI_CHECK_RECEIVED) {
+        if (serial) serial->addRxData(static_cast<uint8_t>((~slowInitTarget_) & 0xff));
+        state_ = IDLE;
+        return;
+    }
     if (state_ == COMPOSING && cpu_->getCycles() >= deadline_) {
         if (cascade_elm::requestToCommand(request_, &pendingCommand_)) {
             state_ = WAITING_RESPONSE;
@@ -83,9 +109,14 @@ bool IfaceElm::hasPendingCommand() const {
     return state_ == WAITING_RESPONSE;
 }
 
-void IfaceElm::sendSlowInit(uint8_t) {
-    // ELM327 performs K-line initialization internally on the first OBD command.
-    // This adapter intentionally does not fake a successful slow-init reply.
+void IfaceElm::sendSlowInit(uint8_t target) {
+    // CASCADE expects the K-line slow-init handshake. ELM performs the physical
+    // initialization itself on the first OBD request, while this compatibility
+    // handshake keeps the emulated serial driver's state machine moving.
+    std::lock_guard<std::mutex> lock(mutex_);
+    slowInitTarget_ = target;
+    state_ = SI_WAIT_55;
+    deadline_ = cpu_->getCycles() + 300ULL * 10000ULL;
 }
 
 void IfaceElm::slowInitImminent() {

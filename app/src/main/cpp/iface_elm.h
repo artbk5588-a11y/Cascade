@@ -27,10 +27,12 @@ public:
     bool hasPendingCommand() const;
 
 private:
-    enum State { IDLE, COMPOSING, WAITING_RESPONSE, COMMAND_CLAIMED, RESPONSE_READY };
+    enum State { IDLE, COMPOSING, WAITING_RESPONSE, COMMAND_CLAIMED, RESPONSE_READY, SI_WAIT_55, SI_WAIT_KEYWORDS, SI_WAIT_CHECK, SI_CHECK_RECEIVED };
     Cpu* cpu_;
     uint64_t deadline_;
     int baudDivisor_;
+    uint8_t slowInitTarget_;
+    uint8_t slowInitCheckByte_;
     State state_;
     std::vector<uint8_t> request_;
     std::string pendingCommand_;
